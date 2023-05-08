@@ -1,4 +1,4 @@
-use rs_wgpu::run;
+use rs_wgpulib::run;
 
 fn main() {
     run();
