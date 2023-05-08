@@ -17,6 +17,8 @@ struct State {
     window: Window,
     clear_color: wgpu::Color,
     render_pipeline: wgpu::RenderPipeline,
+    use_colored_triangle: bool,
+    colored_triangle_render_pipeline: wgpu::RenderPipeline,
 }
 
 impl State {
@@ -138,6 +140,51 @@ impl State {
             multiview: None,
         });
 
+        let use_colored_triangle = false;
+
+        let color_triangle_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("Colored Triangle Shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("colored_triangle_shader.wgsl").into())
+        });
+            
+        let colored_triangle_render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("The Colored Render Pipeline"),
+            layout: Some(&render_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &color_triangle_shader,
+                entry_point: "vs_main",
+                buffers: &[],
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &color_triangle_shader,
+                entry_point: "fs_main",
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: config.format,
+                    blend: Some(wgpu::BlendState::REPLACE),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: Some(wgpu::Face::Back),
+                // Setting this to anything other than Fill requires Features::NON_FILL_POLYGON_MODE
+                polygon_mode: wgpu::PolygonMode::Fill,
+                // Requires Features::DEPTH_CLIP_CONTROL
+                unclipped_depth: false,
+                // Requires Features::CONSERVATIVE_RASTERIZATION
+                conservative: false,
+            },
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState {
+                count: 1,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
+            multiview: None,
+        });
+
         return Self {
             window,
             surface,
@@ -146,7 +193,9 @@ impl State {
             config,
             size,
             clear_color,
-            render_pipeline
+            render_pipeline,
+            use_colored_triangle,
+            colored_triangle_render_pipeline,
         };
     }
 
@@ -174,6 +223,18 @@ impl State {
                     b: 0.15,
                     a: 1.0,
                 };
+                true
+            },
+            WindowEvent::KeyboardInput {
+                input: 
+                    KeyboardInput {
+                        state: ElementState::Pressed,
+                        virtual_keycode: Some(VirtualKeyCode::Space),
+                        ..
+                    },
+                ..
+            } => {
+                self.use_colored_triangle = !self.use_colored_triangle;
                 true
             },
             _ => false
@@ -209,7 +270,15 @@ impl State {
                 depth_stencil_attachment: None,
             });
 
-            render_pass.set_pipeline(&self.render_pipeline);
+            if self.use_colored_triangle
+            {
+                render_pass.set_pipeline(&self.colored_triangle_render_pipeline);
+            }
+            else
+            {
+                render_pass.set_pipeline(&self.render_pipeline);
+            }
+
             render_pass.draw(0..3, 0..1);
         }
         
