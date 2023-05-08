@@ -109,7 +109,7 @@ impl State {
     }
 
     fn update(&mut self) {
-        todo!()
+        // Do nothing
     }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
