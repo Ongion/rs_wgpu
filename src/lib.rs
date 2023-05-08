@@ -9,6 +9,7 @@ use winit::{
 use winit::window::Window;
 use wgpu::util::DeviceExt;
 
+use colorsys::{Rgb, Hsl};
 struct State {
     surface: wgpu::Surface,
     device: wgpu::Device,
@@ -18,11 +19,15 @@ struct State {
     window: Window,
     clear_color: wgpu::Color,
     render_pipeline: wgpu::RenderPipeline,
-    use_colored_triangle: bool,
-    colored_triangle_render_pipeline: wgpu::RenderPipeline,
+    challenge_enabled: bool,
+    
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
     num_indices: u32,
+    
+    challenge_vertex_buffer: wgpu::Buffer,
+    challenge_index_buffer: wgpu::Buffer,
+    challenge_num_indices: u32,
 }
 
 #[repr(C)]
@@ -119,6 +124,8 @@ impl State {
             .filter(|f| f.describe().srgb)
             .next()
             .unwrap_or(surface_caps.formats[0]);
+
+        println!("{:?}", surface_format);
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: surface_format,
@@ -138,7 +145,7 @@ impl State {
         };
 
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("My Pentagon Shader"),
+            label: Some("My Shader"),
             source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into())
         });
 
@@ -189,52 +196,9 @@ impl State {
             multiview: None,
         });
 
-        let use_colored_triangle = false;
+        let challenge_enabled = false;
         let num_indices = INDICES.len() as u32;
-
-        let color_triangle_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("Colored Triangle Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("colored_triangle_shader.wgsl").into())
-        });
             
-        let colored_triangle_render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("The Colored Render Pipeline"),
-            layout: Some(&render_pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &color_triangle_shader,
-                entry_point: "vs_main",
-                buffers: &[],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &color_triangle_shader,
-                entry_point: "fs_main",
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: config.format,
-                    blend: Some(wgpu::BlendState::REPLACE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: Some(wgpu::Face::Back),
-                // Setting this to anything other than Fill requires Features::NON_FILL_POLYGON_MODE
-                polygon_mode: wgpu::PolygonMode::Fill,
-                // Requires Features::DEPTH_CLIP_CONTROL
-                unclipped_depth: false,
-                // Requires Features::CONSERVATIVE_RASTERIZATION
-                conservative: false,
-            },
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState {
-                count: 1,
-                mask: !0,
-                alpha_to_coverage_enabled: false,
-            },
-            multiview: None,
-        });
-
         let vertex_buffer = device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
                 label: Some("My Vertex Buffer"),
@@ -251,6 +215,54 @@ impl State {
             }
         );
 
+        let challenge_num_vertices = 6;
+        let angle = std::f32::consts::TAU / challenge_num_vertices as f32;
+        let mut challenge_verts = (0..challenge_num_vertices)
+            .map(|i| {
+                let theta = angle * i as f32;
+                let theta_degrees = theta * 180.0 * std::f32::consts::FRAC_1_PI;
+
+                let rgb = Rgb::from(Hsl::from((theta_degrees, 100.0, 50.0)));
+                Vertex {
+                    position: [0.5 * theta.cos(), 0.5 * theta.sin(), 0.0],
+                    color: [rgb.red() as f32 / 256.0 , rgb.green() as f32 / 256.0, rgb.blue() as f32 / 256.0],
+                }
+            })
+            .collect::<Vec<_>>();
+
+        challenge_verts.push(Vertex {
+            position: [0.0, 0.0, 0.0],
+            color: [1.0, 1.0, 1.0]
+        });
+
+        println!("{:?}",challenge_verts);
+
+        let challenge_indices = (0u16..challenge_num_vertices)
+            .into_iter()
+            .flat_map(|i| vec![i, (i+1)%(challenge_num_vertices), challenge_num_vertices])
+            .collect::<Vec<_>>();
+
+        println!("{:?}",challenge_indices);
+
+        let challenge_num_indices = challenge_indices.len() as u32;
+
+        let challenge_vertex_buffer = device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("Challenge Vertex Buffer"),
+                contents: bytemuck::cast_slice(&challenge_verts),
+                usage: wgpu::BufferUsages::VERTEX,
+            }
+        );
+
+        let challenge_index_buffer = device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("Challenge Index Buffer"),
+                contents: bytemuck::cast_slice(&challenge_indices),
+                usage: wgpu::BufferUsages::INDEX,
+            }
+        );
+
+
         return Self {
             window,
             surface,
@@ -260,11 +272,13 @@ impl State {
             size,
             clear_color,
             render_pipeline,
-            use_colored_triangle,
-            colored_triangle_render_pipeline,
+            challenge_enabled,
             vertex_buffer,
             index_buffer,
             num_indices,
+            challenge_vertex_buffer,
+            challenge_index_buffer,
+            challenge_num_indices,
         };
     }
 
@@ -303,7 +317,7 @@ impl State {
                     },
                 ..
             } => {
-                self.use_colored_triangle = !self.use_colored_triangle;
+                self.challenge_enabled = !self.challenge_enabled;
                 true
             },
             _ => false
@@ -338,15 +352,17 @@ impl State {
                 ],
                 depth_stencil_attachment: None,
             });
-
-            if self.use_colored_triangle
+            
+            render_pass.set_pipeline(&self.render_pipeline);
+            
+            if self.challenge_enabled
             {
-                render_pass.set_pipeline(&self.colored_triangle_render_pipeline);
-                render_pass.draw(0..3, 0..1);
+                render_pass.set_vertex_buffer(0, self.challenge_vertex_buffer.slice(..));
+                render_pass.set_index_buffer(self.challenge_index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+                render_pass.draw_indexed(0..self.challenge_num_indices, 0, 0..1);
             }
             else
             {
-                render_pass.set_pipeline(&self.render_pipeline);
                 render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
                 render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
                 render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
@@ -362,6 +378,7 @@ impl State {
         Ok(())
     }
 }
+
 
 #[cfg_attr(target_arch="wasm32", wasm_bindgen(start))]
 pub async fn run(event_loop: EventLoop<()>, window: Window) {
