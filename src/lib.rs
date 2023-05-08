@@ -7,6 +7,7 @@ use winit::{
 };
 
 use winit::window::Window;
+use wgpu::util::DeviceExt;
 
 struct State {
     surface: wgpu::Surface,
@@ -19,10 +20,11 @@ struct State {
     render_pipeline: wgpu::RenderPipeline,
     use_colored_triangle: bool,
     colored_triangle_render_pipeline: wgpu::RenderPipeline,
+    vertex_buffer: wgpu::Buffer,
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct Vertex {
     position: [f32; 3],
     color: [f32; 3],
@@ -198,6 +200,14 @@ impl State {
             multiview: None,
         });
 
+        let vertex_buffer = device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("My Vertex Buffer"),
+                contents: bytemuck::cast_slice(VERTICES),
+                usage: wgpu::BufferUsages::VERTEX,
+            }
+        );
+
         return Self {
             window,
             surface,
@@ -209,6 +219,7 @@ impl State {
             render_pipeline,
             use_colored_triangle,
             colored_triangle_render_pipeline,
+            vertex_buffer,
         };
     }
 
