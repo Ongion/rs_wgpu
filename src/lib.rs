@@ -21,6 +21,7 @@ struct State {
     use_colored_triangle: bool,
     colored_triangle_render_pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
+    num_vertices: u32,
 }
 
 #[repr(C)]
@@ -180,6 +181,7 @@ impl State {
         });
 
         let use_colored_triangle = false;
+        let num_vertices = VERTICES.len() as u32;
 
         let color_triangle_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Colored Triangle Shader"),
@@ -244,6 +246,7 @@ impl State {
             use_colored_triangle,
             colored_triangle_render_pipeline,
             vertex_buffer,
+            num_vertices,
         };
     }
 
@@ -283,6 +286,14 @@ impl State {
                 ..
             } => {
                 self.use_colored_triangle = !self.use_colored_triangle;
+                if self.use_colored_triangle
+                {
+                    self.num_vertices = 3u32;
+                }
+                else
+                {
+                    self.num_vertices = VERTICES.len() as u32;
+                }
                 true
             },
             _ => false
@@ -328,7 +339,7 @@ impl State {
                 render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             }
 
-            render_pass.draw(0..3, 0..1);
+            render_pass.draw(0..self.num_vertices, 0..1);
         }
         
 
