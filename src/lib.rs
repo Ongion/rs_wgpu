@@ -104,7 +104,8 @@ impl State {
     }
 
     fn input(&mut self, event: &WindowEvent) -> bool {
-        todo!()
+        // todo: Do some input processing later?
+        false
     }
 
     fn update(&mut self) {
