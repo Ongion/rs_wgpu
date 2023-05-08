@@ -4,7 +4,6 @@ use wasm_bindgen::prelude::*;
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
-    window::WindowBuilder,
 };
 
 use winit::window::Window;
@@ -74,7 +73,7 @@ impl State {
             format: surface_format,
             width: size.width,
             height: size.height,
-            present_mode: wgpu::PresentMode::AutoVsync
+            present_mode: wgpu::PresentMode::AutoVsync,
             alpha_mode: surface_caps.alpha_modes[0],
             view_formats: vec![],
         };
@@ -112,7 +111,7 @@ impl State {
 }
 
 #[cfg_attr(target_arch="wasm32", wasm_bindgen(start))]
-pub aync fn run() {
+pub async fn run(event_loop: EventLoop<()>, window: Window) {
     cfg_if::cfg_if! {
         if #[cfg(target_arch = "wasm32")] {
             std::panic::set_hook(Box::new(console_error_panic_hook::hook));
@@ -122,28 +121,25 @@ pub aync fn run() {
         }
     }
     
-    let event_loop = EventLoop::new();
-    let window = WindowBuilder::new().build(&event_loop).unwrap();
-
-    #[cfg(target_arch = "wasm32")]
-    {
-        // Winit prevents sizing with CSS, so we have to set
-        // the size manually when on web.
-        // TODO: Wow, really? Can't create a full-screen canvas for web? That seems dumb!
-        // Can probably be done with CSS, this is probably only true if you're injecting a canvas where one didn't previously exist. 
-        use winit::dpi::PhysicalSize;
-        window.set_inner_size(PhysicalSize::new(450, 400));
-        
-        use winit::platform::web::WindowExtWebSys;
+    // If window create failed on web, assume webgpu versioning is the cause.
+    #[cfg(target_arch="wasm32")]
+    if surface.is_err() {
         web_sys::window()
             .and_then(|win| win.document())
-            .and_then(|doc| {
-                let dst = doc.get_element_by_id("wasm-example")?;
-                let canvas = web_sys::Element::from(window.canvas());
-                dst.append_child(&canvas).ok()?;
-                Some(())
-            })
-            .expect("Couldn't append canvas to document body.");
+            .and_then(|doc| Some(
+                doc.body()
+                    .and_then(|body| {
+                        let div = doc.create_element("p").unwrap();
+                        div.set_class_name("alert");
+                        div.append_child(&doc.create_text_node("This app requires WebGPU. Either your browser does not support WebGPU, or you must enable an experimental flag to access it.")).unwrap();
+                        body.replace_child(
+                            &div,
+                            &web_sys::Element::from(window.canvas()))
+                            .ok()
+                    })
+                    .expect("couldn't append canvas to document body")
+            ));
+        return
     }
 
     let mut state = State::new(window).await;
@@ -152,7 +148,7 @@ pub aync fn run() {
         Event::WindowEvent {
             ref event,
             window_id,
-        } if window_id == window.id() => match event {
+        } if window_id == state.window().id() => match event {
             WindowEvent::CloseRequested
             | WindowEvent::KeyboardInput {
                 input:
