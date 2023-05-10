@@ -49,6 +49,8 @@ struct State {
     clear_color: wgpu::Color,
     render_pipeline: wgpu::RenderPipeline,
     camera: Camera,
+    camera_buffer: wgpu::Buffer,
+    camera_bind_group: wgpu::BindGroup,
     
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
@@ -281,6 +283,33 @@ impl State {
             }
         );
         
+        let camera_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }
+            ],
+            label: Some("A Camera Bind Group Layout"),
+        });
+
+        let camera_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &camera_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: camera_buffer.as_entire_binding(),
+                }
+            ],
+            label: Some("My Camera Bind Group"),
+        });
+
         let clear_color = wgpu::Color{
             r: 0.05,
             g: 0.05,
@@ -296,7 +325,10 @@ impl State {
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("A Render Pipeline Layout"),
-                bind_group_layouts: &[&texture_bind_group_layout],
+                bind_group_layouts: &[
+                    &texture_bind_group_layout,
+                    &camera_bind_group_layout,
+                ],
                 push_constant_ranges: &[],
             });
             
@@ -369,6 +401,8 @@ impl State {
             clear_color,
             render_pipeline,
             camera,
+            camera_buffer,
+            camera_bind_group,
             vertex_buffer,
             index_buffer,
             num_indices,
@@ -460,10 +494,12 @@ impl State {
             render_pass.set_pipeline(&self.render_pipeline);
             
             render_pass.set_bind_group(0, &bind_group, &[]);
+            render_pass.set_bind_group(1, &self.camera_bind_group, &[]);
+
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+            
             render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
-
         }
         
 
