@@ -9,7 +9,6 @@ use winit::{
 use winit::window::Window;
 use wgpu::util::DeviceExt;
 
-use colorsys::{Rgb, Hsl};
 struct State {
     surface: wgpu::Surface,
     device: wgpu::Device,

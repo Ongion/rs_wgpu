@@ -13,7 +13,6 @@ log = "0.4"
 wgpu = "0.15"
 pollster = "0.2"
 bytemuck = { version = "1.12", features = [ "derive" ] }
-colorsys = "0.6.7"
 
 [dependencies.image]
 version = "0.24"
