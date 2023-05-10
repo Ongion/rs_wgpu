@@ -125,7 +125,6 @@ impl State {
             .next()
             .unwrap_or(surface_caps.formats[0]);
 
-        println!("{:?}", surface_format);
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: surface_format,
@@ -235,14 +234,10 @@ impl State {
             color: [1.0, 1.0, 1.0]
         });
 
-        println!("{:?}",challenge_verts);
-
         let challenge_indices = (0u16..challenge_num_vertices)
             .into_iter()
             .flat_map(|i| vec![i, (i+1)%(challenge_num_vertices), challenge_num_vertices])
             .collect::<Vec<_>>();
-
-        println!("{:?}",challenge_indices);
 
         let challenge_num_indices = challenge_indices.len() as u32;
 
