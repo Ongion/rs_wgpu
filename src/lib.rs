@@ -29,6 +29,8 @@ struct State {
     diffuse_texture: texture::Texture,
     
     challenge_enabled: bool,
+    challenge_diffuse_bind_group: wgpu::BindGroup,
+    challenge_diffuse_texture: texture::Texture,
 }
 
 #[repr(C)]
@@ -140,6 +142,9 @@ impl State {
         let diffuse_bytes = include_bytes!("happy-tree.png");
         let diffuse_texture = texture::Texture::from_bytes(&device, &queue, diffuse_bytes, "My Happy Tree!").unwrap();
 
+        let challenge_diffuse_bytes = include_bytes!("crab-rave.jpg");
+        let challenge_diffuse_texture = texture::Texture::from_bytes(&device, &queue, challenge_diffuse_bytes, "Crab Rave").unwrap();
+
         let texture_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 entries: &[
@@ -181,6 +186,24 @@ impl State {
                 label: Some("diffuse_bind_group"),
             }
         );
+
+        let challenge_diffuse_bind_group = device.create_bind_group(
+            &wgpu::BindGroupDescriptor {
+                layout: &texture_bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(&challenge_diffuse_texture.view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(&challenge_diffuse_texture.sampler),
+                    }
+                ],
+                label: Some("challenge diffuse bind group"),
+            }
+        );
+
         
         let clear_color = wgpu::Color{
             r: 0.05,
@@ -275,6 +298,8 @@ impl State {
             diffuse_bind_group,
             diffuse_texture,
             challenge_enabled,
+            challenge_diffuse_bind_group,
+            challenge_diffuse_texture,
         };
     }
 
@@ -349,9 +374,15 @@ impl State {
                 depth_stencil_attachment: None,
             });
             
+            let bind_group = if self.challenge_enabled {
+                &self.challenge_diffuse_bind_group
+            } else {
+                &self.diffuse_bind_group
+            };
+
             render_pass.set_pipeline(&self.render_pipeline);
             
-            render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]);
+            render_pass.set_bind_group(0, &bind_group, &[]);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
             render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
