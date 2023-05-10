@@ -26,9 +26,6 @@ struct State {
     diffuse_bind_group: wgpu::BindGroup, 
     
     challenge_enabled: bool,
-    challenge_vertex_buffer: wgpu::Buffer,
-    challenge_index_buffer: wgpu::Buffer,
-    challenge_num_indices: u32,
 }
 
 #[repr(C)]
@@ -327,50 +324,6 @@ impl State {
             }
         );
 
-        let challenge_num_vertices = 6;
-        let angle = std::f32::consts::TAU / challenge_num_vertices as f32;
-        let mut challenge_verts = (0..challenge_num_vertices)
-            .map(|i| {
-                let theta = angle * i as f32;
-                let theta_degrees = theta * 180.0 * std::f32::consts::FRAC_1_PI;
-
-                let rgb = Rgb::from(Hsl::from((theta_degrees, 100.0, 50.0)));
-                Vertex {
-                    position: [0.5 * theta.cos(), 0.5 * theta.sin(), 0.0],
-                    color: [rgb.red() as f32 / 256.0 , rgb.green() as f32 / 256.0, rgb.blue() as f32 / 256.0],
-                }
-            })
-            .collect::<Vec<_>>();
-
-        challenge_verts.push(Vertex {
-            position: [0.0, 0.0, 0.0],
-            color: [1.0, 1.0, 1.0]
-        });
-
-        let challenge_indices = (0u16..challenge_num_vertices)
-            .into_iter()
-            .flat_map(|i| vec![i, (i+1)%(challenge_num_vertices), challenge_num_vertices])
-            .collect::<Vec<_>>();
-
-        let challenge_num_indices = challenge_indices.len() as u32;
-
-        let challenge_vertex_buffer = device.create_buffer_init(
-            &wgpu::util::BufferInitDescriptor {
-                label: Some("Challenge Vertex Buffer"),
-                contents: bytemuck::cast_slice(&challenge_verts),
-                usage: wgpu::BufferUsages::VERTEX,
-            }
-        );
-
-        let challenge_index_buffer = device.create_buffer_init(
-            &wgpu::util::BufferInitDescriptor {
-                label: Some("Challenge Index Buffer"),
-                contents: bytemuck::cast_slice(&challenge_indices),
-                usage: wgpu::BufferUsages::INDEX,
-            }
-        );
-
-
         return Self {
             window,
             surface,
@@ -385,9 +338,6 @@ impl State {
             num_indices,
             diffuse_bind_group,
             challenge_enabled,
-            challenge_vertex_buffer,
-            challenge_index_buffer,
-            challenge_num_indices,
         };
     }
 
@@ -464,19 +414,10 @@ impl State {
             
             render_pass.set_pipeline(&self.render_pipeline);
             
-            if self.challenge_enabled
-            {
-                render_pass.set_vertex_buffer(0, self.challenge_vertex_buffer.slice(..));
-                render_pass.set_index_buffer(self.challenge_index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-                render_pass.draw_indexed(0..self.challenge_num_indices, 0, 0..1);
-            }
-            else
-            {
-                render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]);
-                render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-                render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-                render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
-            }
+            render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]);
+            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+            render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+            render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
 
         }
         
