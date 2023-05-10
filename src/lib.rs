@@ -137,6 +137,7 @@ struct State {
     render_pipeline: wgpu::RenderPipeline,
     camera: Camera,
     camera_controller: CameraController,
+    camera_uniform: CameraUniform,
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
     
@@ -492,6 +493,7 @@ impl State {
             render_pipeline,
             camera,
             camera_controller,
+            camera_uniform,
             camera_buffer,
             camera_bind_group,
             vertex_buffer,
@@ -552,7 +554,9 @@ impl State {
     }
 
     fn update(&mut self) {
-        // Do nothing
+        self.camera_controller.update_camera(&mut self.camera);
+        self.camera_uniform.update_view_proj(&self.camera);
+        self.queue.write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(&[self.camera_uniform]));
     }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
