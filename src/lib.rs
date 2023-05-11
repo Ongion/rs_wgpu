@@ -95,33 +95,36 @@ impl CameraController {
 
     fn update_camera(&self, camera: &mut Camera) {
         use cgmath::InnerSpace;
-        let forward = camera.target - camera.eye;
-        let forward_norm = forward.normalize();
-        let forward_mag = forward.magnitude();
+
+        let cam_focus_vector = camera.eye - camera.target;
+        let cam_focus_vector_norm = cam_focus_vector.normalize();
+        let cam_focus_vector_mag = cam_focus_vector.magnitude();
 
         // Prevents glitching when camera gets too close to the
         // center of the scene.
-        if self.is_forward_pressed && forward_mag > self.speed {
-            camera.eye += forward_norm * self.speed;
+        // cam_focus_vector is pointing "backward"
+        if self.is_forward_pressed && cam_focus_vector_mag > self.speed {
+            camera.eye -= cam_focus_vector_norm * self.speed;
         }
         if self.is_backward_pressed {
-            camera.eye -= forward_norm * self.speed;
+            camera.eye += cam_focus_vector_norm * self.speed;
         }
 
-        let right = forward_norm.cross(camera.up);
 
         // Redo radius calc in case the fowrard/backward is pressed.
-        let forward = camera.target - camera.eye;
-        let forward_mag = forward.magnitude();
+        let cam_focus_vector = camera.eye - camera.target;
+        let cam_focus_vector_mag = cam_focus_vector.magnitude();
 
+        let theta = cgmath::Rad(self.speed / cam_focus_vector_mag);
+
+        
         if self.is_right_pressed {
-            // Rescale the distance between the target and eye so 
-            // that it doesn't change. The eye therefore still 
-            // lies on the circle made by the target and eye.
-            camera.eye = camera.target - (forward + right * self.speed).normalize() * forward_mag;
+            let rotate = cgmath::Matrix3::from_axis_angle(camera.up, theta);
+            camera.eye = camera.target + (rotate * cam_focus_vector)
         }
         if self.is_left_pressed {
-            camera.eye = camera.target - (forward - right * self.speed).normalize() * forward_mag;
+            let rotate = cgmath::Matrix3::from_axis_angle(camera.up, -theta);
+            camera.eye = camera.target + (rotate * cam_focus_vector)
         }
     }
 }
