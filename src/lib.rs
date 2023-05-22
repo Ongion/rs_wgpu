@@ -143,6 +143,7 @@ struct State {
     camera_uniform: CameraUniform,
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
+    model_rotation: cgmath::Deg<f32>,
     
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
@@ -216,8 +217,10 @@ impl CameraUniform {
         }
     }
 
-    fn update_view_proj(&mut self, camera: &Camera) {
-        self.view_proj = camera.build_view_projection_matrix().into();
+    fn update_view_proj(&mut self, camera: &Camera, model_rotation: cgmath::Deg<f32>) {
+        self.view_proj = (camera.build_view_projection_matrix()
+            * cgmath::Matrix4::from_angle_z(model_rotation))
+        .into();
     }
 }
 
@@ -365,7 +368,8 @@ impl State {
         };
 
         let mut camera_uniform = CameraUniform::new();
-        camera_uniform.update_view_proj(&camera);
+        let model_rotation = cgmath::Deg(0.0);
+        camera_uniform.update_view_proj(&camera, model_rotation);
 
         let camera_buffer = device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
@@ -499,6 +503,7 @@ impl State {
             camera_uniform,
             camera_buffer,
             camera_bind_group,
+            model_rotation,
             vertex_buffer,
             index_buffer,
             num_indices,
@@ -558,7 +563,8 @@ impl State {
 
     fn update(&mut self) {
         self.camera_controller.update_camera(&mut self.camera);
-        self.camera_uniform.update_view_proj(&self.camera);
+        self.model_rotation += cgmath::Deg(2.0);
+        self.camera_uniform.update_view_proj(&self.camera, self.model_rotation);
         self.queue.write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(&[self.camera_uniform]));
     }
 
